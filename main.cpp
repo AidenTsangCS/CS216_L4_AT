@@ -1,18 +1,65 @@
-//Aiden Tsang
-//Lab 4
+// CS216 Lab 4: Sorting and Searching with Pointers
+// Aiden Tsang
 
-#include <iostream>
 #include <fstream>
-#include <string>
 #include <iomanip>
+#include <iostream>
+#include <limits>
+#include <sstream>
+#include <string>
 
 using namespace std;
 
-// Global constants
 const int MAX_CREATURES = 100;
 const string INPUT_FILE = "in_creaturelist.txt";
+const int COL_NAME = 20;
+const int COL_TYPE = 15;
+const int COL_NUM = 10;
+const int TABLE_WIDTH = COL_NAME + COL_TYPE + COL_NUM + COL_NUM;
 
-// Enums for Menus
+string toLower(const string &str);
+
+class Creature
+{
+private:
+  string name = "";
+  string type = "";
+  int health = 0;
+  int strength = 0;
+  string nameLower = ""; // stored once in lower case to expedite search and sort
+  string typeLower = "";
+
+public:
+  Creature();
+  void setRecord(const string &newType, const string &newName, int newHealth, int newStrength);
+  string getName() const;
+  string getType() const;
+  int getHealth() const;
+  int getStrength() const;
+  string getNameLower() const;
+  string getTypeLower() const;
+  string toString() const;
+};
+
+class Army
+{
+private:
+  Creature creatures[MAX_CREATURES];
+  Creature *creaturePointers[MAX_CREATURES] = {nullptr};
+  int count = 0;
+
+  void loadCreatures(const string &filename); // private: called only by the constructor
+  string line() const;
+  string header() const;
+
+public:
+  Army(const string &filename = INPUT_FILE);
+  void sortCreatures(int sortOption);
+  string originalToString() const;
+  string sortedToString() const;
+  string searchCreatures(const string &searchTerm) const;
+};
+
 enum MainMenu
 {
   PRINT = 1,
@@ -20,623 +67,580 @@ enum MainMenu
   SEARCH,
   QUIT
 };
-enum SortMenu
+enum SortOption
 {
-  BY_ID = 1,
-  BY_NAME,
+  BY_NAME = 1,
   BY_TYPE,
-  BY_LEVEL,
+  BY_HEALTH,
+  BY_STRENGTH,
   BACK_TO_MAIN
 };
 
-class Creature
-{
-private:
-  int id;
-  string name;
-  string type;
-  int level;
-  string nameLower;
-  string typeLower;
-
-public:
-  Creature();
-  void setRecord(int cId, string cName, string cType, int cLevel);
-  int getId() const;
-  string getName() const;
-  string getType() const;
-  int getLevel() const;
-  string getNameLower() const;
-  string getTypeLower() const;
-  void printRecord() const;
-};
-
-class Army
-{
-private:
-  Creature creatures[MAX_CREATURES];
-  Creature *creaturePointers[MAX_CREATURES];
-  int count;
-  string toLower(string str);
-
-public:
-  Army();
-  void loadCreatures(string filename);
-  void printOriginal() const;
-  void printSortedPointers() const;
-  void sortCreatures(int sortOption);
-  void searchCreatures(string searchTerm);
-};
+void clearCin(const string &errorMessage);
+void sortMenu(Army &army);
+void searchOption(const Army &army);
 
 int main()
 {
   Army myArmy;
-  myArmy.loadCreatures(INPUT_FILE);
-
   int mainChoice = 0;
-
-  while (mainChoice != QUIT)
+  do
   {
-    cout << "\n=== Main Menu ===\n";
-    cout << "1. Print Original List\n";
-    cout << "2. Sort Menu (Descending)\n";
-    cout << "3. Search (Name or Type)\n";
-    cout << "4. Quit\n";
-    cout << "Enter selection: ";
-
-    if (!(cin >> mainChoice))
-    {
-      cin.clear();
-      cin.ignore(10000, '\n');
-      mainChoice = 0;
-    }
-
+    cout << "\n\nMain Menu:\n"
+            "1. Print creatures in the original order\n"
+            "2. Sort menu\n"
+            "3. Search by name or type\n"
+            "4. Quit\n"
+            "Enter your choice: ";
+    cin >> mainChoice;
     switch (mainChoice)
     {
     case PRINT:
-      myArmy.printOriginal();
+      cout << '\n'
+           << myArmy.originalToString();
       break;
-
     case SORT_MENU:
-    {
-      int sortChoice = 0;
-      while (sortChoice != BACK_TO_MAIN)
-      {
-        cout << "\n--- Sort Submenu (Descending) ---\n";
-        cout << "1. Sort by ID\n";
-        cout << "2. Sort by Name\n";
-        cout << "3. Sort by Type\n";
-        cout << "4. Sort by Level\n";
-        cout << "5. Back to Main Menu\n";
-        cout << "Enter selection: ";
-
-        if (!(cin >> sortChoice))
-        {
-          cin.clear();
-          cin.ignore(10000, '\n');
-          sortChoice = 0;
-        }
-
-        switch (sortChoice)
-        {
-        case BY_ID:
-        case BY_NAME:
-        case BY_TYPE:
-        case BY_LEVEL:
-          myArmy.sortCreatures(sortChoice);
-          myArmy.printSortedPointers();
-          break;
-        case BACK_TO_MAIN:
-          cout << "Returning to main menu...\n";
-          break;
-        default:
-          cout << "Invalid choice. Try again.\n";
-        }
-      }
+      sortMenu(myArmy);
       break;
-    }
-
     case SEARCH:
-    {
-      string searchTerm;
-      cout << "Enter search term (partial or full Name/Type): ";
-      cin >> searchTerm;
-      myArmy.searchCreatures(searchTerm);
+      searchOption(myArmy);
       break;
-    }
-
     case QUIT:
-      cout << "Exiting application. Goodbye!\n";
+      cout << "\nGoodbye!\n";
       break;
-
     default:
-      cout << "Invalid main menu selection.\n";
+      clearCin("Invalid menu choice");
     }
-  }
-
+  } while (mainChoice != QUIT);
   return 0;
 }
 
-Creature::Creature()
+Creature::Creature() {} // member variables already initialized in the class definition
+
+void Creature::setRecord(const string &newType, const string &newName, int newHealth,
+                         int newStrength)
 {
-  id = 0;
-  name = "";
-  type = "";
-  level = 0;
-  nameLower = "";
-  typeLower = "";
+  type = newType;
+  name = newName;
+  health = newHealth;
+  strength = newStrength;
+  typeLower = toLower(type); // converted once here, not repeatedly during sort/search
+  nameLower = toLower(name);
 }
 
-void Creature::setRecord(int cId, string cName, string cType, int cLevel)
+string Creature::getName() const
 {
-  id = cId;
-  name = cName;
-  type = cType;
-  level = cLevel;
-
-  nameLower = "";
-  for (int i = 0; i < name.length(); i++)
-  {
-    if (name[i] >= 'A' && name[i] <= 'Z')
-    {
-      nameLower += (name[i] + 32);
-    }
-    else
-    {
-      nameLower += name[i];
-    }
-  }
-
-  typeLower = "";
-  for (int i = 0; i < type.length(); i++)
-  {
-    if (type[i] >= 'A' && type[i] <= 'Z')
-    {
-      typeLower += (type[i] + 32);
-    }
-    else
-    {
-      typeLower += type[i];
-    }
-  }
+  return name;
 }
 
-int Creature::getId() const { return id; }
-string Creature::getName() const { return name; }
-string Creature::getType() const { return type; }
-int Creature::getLevel() const { return level; }
-string Creature::getNameLower() const { return nameLower; }
-string Creature::getTypeLower() const { return typeLower; }
-
-void Creature::printRecord() const
+string Creature::getType() const
 {
-  cout << left << setw(10) << id
-       << setw(20) << name
-       << setw(15) << type
-       << right << setw(10) << level << endl;
+  return type;
 }
 
-Army::Army()
+int Creature::getHealth() const
 {
-  count = 0;
+  return health;
 }
 
-string Army::toLower(string str)
+int Creature::getStrength() const
 {
-  string lowerStr = "";
-  for (int i = 0; i < str.length(); i++)
-  {
-    if (str[i] >= 'A' && str[i] <= 'Z')
-    {
-      lowerStr += (str[i] + 32);
-    }
-    else
-    {
-      lowerStr += str[i];
-    }
-  }
-  return lowerStr;
+  return strength;
 }
 
-void Army::loadCreatures(string filename)
+string Creature::getNameLower() const
+{
+  return nameLower;
+}
+
+string Creature::getTypeLower() const
+{
+  return typeLower;
+}
+
+string Creature::toString() const
+{
+  ostringstream out;
+  out << left << setw(COL_NAME) << name << setw(COL_TYPE) << type << right << setw(COL_NUM)
+      << health << setw(COL_NUM) << strength << '\n';
+  return out.str();
+}
+
+Army::Army(const string &filename)
+{
+  loadCreatures(filename);
+}
+
+void Army::loadCreatures(const string &filename)
 {
   ifstream inFile(filename);
-  int id, level;
-  string type, name;
-
   if (inFile.is_open())
   {
-    while (count < MAX_CREATURES && inFile >> type >> name >> id >> level)
+    string newType;
+    string newName;
+    int newHealth = 0;
+    int newStrength = 0;
+    while (count < MAX_CREATURES && inFile >> newType >> newName >> newHealth >> newStrength)
     {
-      creatures[count].setRecord(id, name, type, level);
+      creatures[count].setRecord(newType, newName, newHealth, newStrength);
+      creaturePointers[count] = &creatures[count]; // pointers assigned once, at load time
       count++;
     }
     inFile.close();
   }
   else
   {
-    cout << "Error: Could not open file " << filename << endl;
-  }
-
-  for (int i = 0; i < count; i++)
-  {
-    creaturePointers[i] = &creatures[i];
+    cout << "\nError: could not open " << filename << '\n';
   }
 }
 
-void Army::printOriginal() const
+string Army::line() const
 {
-  cout << "\n-----------------------------------------------------\n";
-  cout << left << setw(10) << "ID" << setw(20) << "Name" << setw(15) << "Type" << right << setw(10) << "Level" << endl;
-  cout << "-----------------------------------------------------\n";
-  for (int i = 0; i < count; i++)
-  {
-    creatures[i].printRecord();
-  }
-  cout << "-----------------------------------------------------\n";
+  ostringstream out;
+  out << setfill('-') << setw(TABLE_WIDTH) << "" << '\n';
+  return out.str();
 }
 
-void Army::printSortedPointers() const
+string Army::header() const
 {
-  cout << "\n-----------------------------------------------------\n";
-  cout << left << setw(10) << "ID" << setw(20) << "Name" << setw(15) << "Type" << right << setw(10) << "Level" << endl;
-  cout << "-----------------------------------------------------\n";
-  for (int i = 0; i < count; i++)
-  {
-    creaturePointers[i]->printRecord();
-  }
-  cout << "-----------------------------------------------------\n";
+  ostringstream out;
+  out << line() << left << setw(COL_NAME) << "Name" << setw(COL_TYPE) << "Type" << right
+      << setw(COL_NUM) << "Health" << setw(COL_NUM) << "Strength" << '\n'
+      << line();
+  return out.str();
 }
 
 void Army::sortCreatures(int sortOption)
 {
   bool swapped = true;
-  int i = 0;
-  Creature *temp = NULL;
-
   while (swapped)
   {
     swapped = false;
-    i = 0;
-    while (i < count - 1)
+    for (int i = 0; i < count - 1; i++)
     {
       bool toSwap = false;
-
       switch (sortOption)
       {
-      case BY_ID:
-        toSwap = creaturePointers[i]->getId() < creaturePointers[i + 1]->getId();
-        break;
       case BY_NAME:
-        toSwap = creaturePointers[i]->getNameLower() < creaturePointers[i + 1]->getNameLower();
+        toSwap = creaturePointers[i]->getNameLower() <
+                 creaturePointers[i + 1]->getNameLower();
         break;
       case BY_TYPE:
-        toSwap = creaturePointers[i]->getTypeLower() < creaturePointers[i + 1]->getTypeLower();
+        toSwap = creaturePointers[i]->getTypeLower() <
+                 creaturePointers[i + 1]->getTypeLower();
         break;
-      case BY_LEVEL:
-        toSwap = creaturePointers[i]->getLevel() < creaturePointers[i + 1]->getLevel();
+      case BY_HEALTH:
+        toSwap = creaturePointers[i]->getHealth() < creaturePointers[i + 1]->getHealth();
+        break;
+      case BY_STRENGTH:
+        toSwap = creaturePointers[i]->getStrength() <
+                 creaturePointers[i + 1]->getStrength();
         break;
       }
-
       if (toSwap)
       {
-        temp = creaturePointers[i];
+        Creature *temp = creaturePointers[i]; // swapping pointers only, done inline
         creaturePointers[i] = creaturePointers[i + 1];
         creaturePointers[i + 1] = temp;
         swapped = true;
       }
-      i++;
     }
   }
 }
 
-void Army::searchCreatures(string searchTerm)
+string Army::originalToString() const
 {
-  string searchLower = toLower(searchTerm);
-  bool foundAny = false;
-
-  cout << "\n-----------------------------------------------------\n";
-  cout << left << setw(10) << "ID" << setw(20) << "Name" << setw(15) << "Type" << right << setw(10) << "Level" << endl;
-  cout << "-----------------------------------------------------\n";
-
+  string result = header();
   for (int i = 0; i < count; i++)
   {
+    result += creatures[i].toString();
+  }
+  result += line();
+  return result;
+}
+
+string Army::sortedToString() const
+{
+  string result = header();
+  for (int i = 0; i < count; i++)
+  {
+    result += creaturePointers[i]->toString();
+  }
+  result += line();
+  return result;
+}
+
+string Army::searchCreatures(const string &searchTerm) const
+{
+  string matches;
+  string searchLower = toLower(searchTerm);
+  for (int i = 0; i < count; i++)
+  { // one pass checks both name and type
     if (creatures[i].getNameLower().find(searchLower) != string::npos ||
         creatures[i].getTypeLower().find(searchLower) != string::npos)
     {
-      creatures[i].printRecord();
-      foundAny = true;
+      matches += creatures[i].toString();
     }
   }
-  cout << "-----------------------------------------------------\n";
-
-  if (!foundAny)
+  string result;
+  if (!matches.empty())
   {
-    cout << "No matching records found.\n";
+    result = header() + matches + line();
   }
+  return result;
 }
 
-/*Output
-aidentsang@Aidens-MacBook-Pro CS216_L4_AT % "/Users/aidentsang/Pierce college Labs C++/CS216_L4_AT/main"
+string toLower(const string &str)
+{
+  string lowerStr;
+  for (size_t i = 0; i < str.length(); i++)
+  {
+    lowerStr += (str[i] >= 'A' && str[i] <= 'Z') ? char(str[i] + 32) : str[i];
+  }
+  return lowerStr;
+}
 
-=== Main Menu ===
-1. Print Original List
-2. Sort Menu (Descending)
-3. Search (Name or Type)
+void clearCin(const string &errorMessage)
+{ // reusable: clears failed input, reports the error
+  cin.clear();
+  cin.ignore(numeric_limits<streamsize>::max(), '\n');
+  cout << '\n'
+       << errorMessage << '\n';
+}
+
+void sortMenu(Army &army)
+{
+  int sortChoice = 0;
+  do
+  {
+    cout << "\n\nSort Menu (descending):\n"
+            "1. Sort by name\n"
+            "2. Sort by type\n"
+            "3. Sort by health\n"
+            "4. Sort by strength\n"
+            "5. Back to main menu\n"
+            "Enter your choice: ";
+    cin >> sortChoice;
+    switch (sortChoice)
+    {
+    case BY_NAME:
+    case BY_TYPE:
+    case BY_HEALTH:
+    case BY_STRENGTH:
+      army.sortCreatures(sortChoice);
+      cout << '\n'
+           << army.sortedToString();
+      break;
+    case BACK_TO_MAIN:
+      cout << "\nGoing back to the main menu\n";
+      break;
+    default:
+      clearCin("Invalid menu choice");
+    }
+  } while (sortChoice != BACK_TO_MAIN);
+}
+
+void searchOption(const Army &army)
+{
+  string searchTerm;
+  cout << "\nEnter a name or type to search for (partial is ok): ";
+  cin >> searchTerm;
+  string result = army.searchCreatures(searchTerm);
+  if (result.empty())
+  {
+    result = "No matching records found\n";
+  }
+  cout << '\n'
+       << result;
+}
+
+/*aidentsang@Aidens-MacBook-Pro CS216_L4_AT % "/Users/aidentsang/Pierce college Labs C++/CS216_L4_AT/main"
+
+
+Main Menu:
+1. Print creatures in the original order
+2. Sort menu
+3. Search by name or type
 4. Quit
-Enter selection: 1
+Enter your choice: 1
 
------------------------------------------------------
-ID        Name                Type                Level
------------------------------------------------------
-101       sTRolleR            Goblin                 45
-102       sMaUg               Dragon                 99
-103       rITA                Elf                    70
-104       gRoG                Orc                    32
-105       fLaMeR              Phoenix                85
-106       rOLLer              Stroller               12
-107       bOuNdEr             Troll                  55
-108       dRaCuLa             Vampire                90
-109       fAnG                Werewolf               64
-110       sWiFt               Centaur                73
-111       tInK                Pixie                  15
-112       sToNeR              Golem                  80
-113       sHaDoW              Wraith                 67
-114       sKyClAw             Griffin                88
-115       aQuA                Mermaid                40
-116       tAuRoS              Minotaur               77
-117       sPlItTeR            Hydra                  95
-118       wInGs               Pegasus                60
-119       mIxUp               Chimera                82
-120       sCrEeCh             Banshee                50
------------------------------------------------------
+-------------------------------------------------------
+Name                Type               Health  Strength
+-------------------------------------------------------
+sTRolleR            Goblin                101        45
+sMaUg               Dragon                102        99
+rITA                Elf                   103        70
+gRoG                Orc                   104        32
+fLaMeR              Phoenix               105        85
+rOLLer              Stroller              106        12
+bOuNdEr             Troll                 107        55
+dRaCuLa             Vampire               108        90
+fAnG                Werewolf              109        64
+sWiFt               Centaur               110        73
+tInK                Pixie                 111        15
+sToNeR              Golem                 112        80
+sHaDoW              Wraith                113        67
+sKyClAw             Griffin               114        88
+aQuA                Mermaid               115        40
+tAuRoS              Minotaur              116        77
+sPlItTeR            Hydra                 117        95
+wInGs               Pegasus               118        60
+mIxUp               Chimera               119        82
+sCrEeCh             Banshee               120        50
+-------------------------------------------------------
 
-=== Main Menu ===
-1. Print Original List
-2. Sort Menu (Descending)
-3. Search (Name or Type)
+
+Main Menu:
+1. Print creatures in the original order
+2. Sort menu
+3. Search by name or type
 4. Quit
-Enter selection: 2
+Enter your choice: 2
 
---- Sort Submenu (Descending) ---
-1. Sort by ID
-2. Sort by Name
-3. Sort by Type
-4. Sort by Level
-5. Back to Main Menu
-Enter selection: 1
 
------------------------------------------------------
-ID        Name                Type                Level
------------------------------------------------------
-120       sCrEeCh             Banshee                50
-119       mIxUp               Chimera                82
-118       wInGs               Pegasus                60
-117       sPlItTeR            Hydra                  95
-116       tAuRoS              Minotaur               77
-115       aQuA                Mermaid                40
-114       sKyClAw             Griffin                88
-113       sHaDoW              Wraith                 67
-112       sToNeR              Golem                  80
-111       tInK                Pixie                  15
-110       sWiFt               Centaur                73
-109       fAnG                Werewolf               64
-108       dRaCuLa             Vampire                90
-107       bOuNdEr             Troll                  55
-106       rOLLer              Stroller               12
-105       fLaMeR              Phoenix                85
-104       gRoG                Orc                    32
-103       rITA                Elf                    70
-102       sMaUg               Dragon                 99
-101       sTRolleR            Goblin                 45
------------------------------------------------------
+Sort Menu (descending):
+1. Sort by name
+2. Sort by type
+3. Sort by health
+4. Sort by strength
+5. Back to main menu
+Enter your choice: 1
 
---- Sort Submenu (Descending) ---
-1. Sort by ID
-2. Sort by Name
-3. Sort by Type
-4. Sort by Level
-5. Back to Main Menu
-Enter selection: 2
+-------------------------------------------------------
+Name                Type               Health  Strength
+-------------------------------------------------------
+wInGs               Pegasus               118        60
+tInK                Pixie                 111        15
+tAuRoS              Minotaur              116        77
+sWiFt               Centaur               110        73
+sTRolleR            Goblin                101        45
+sToNeR              Golem                 112        80
+sPlItTeR            Hydra                 117        95
+sMaUg               Dragon                102        99
+sKyClAw             Griffin               114        88
+sHaDoW              Wraith                113        67
+sCrEeCh             Banshee               120        50
+rOLLer              Stroller              106        12
+rITA                Elf                   103        70
+mIxUp               Chimera               119        82
+gRoG                Orc                   104        32
+fLaMeR              Phoenix               105        85
+fAnG                Werewolf              109        64
+dRaCuLa             Vampire               108        90
+bOuNdEr             Troll                 107        55
+aQuA                Mermaid               115        40
+-------------------------------------------------------
 
------------------------------------------------------
-ID        Name                Type                Level
------------------------------------------------------
-118       wInGs               Pegasus                60
-111       tInK                Pixie                  15
-116       tAuRoS              Minotaur               77
-110       sWiFt               Centaur                73
-101       sTRolleR            Goblin                 45
-112       sToNeR              Golem                  80
-117       sPlItTeR            Hydra                  95
-102       sMaUg               Dragon                 99
-114       sKyClAw             Griffin                88
-113       sHaDoW              Wraith                 67
-120       sCrEeCh             Banshee                50
-106       rOLLer              Stroller               12
-103       rITA                Elf                    70
-119       mIxUp               Chimera                82
-104       gRoG                Orc                    32
-105       fLaMeR              Phoenix                85
-109       fAnG                Werewolf               64
-108       dRaCuLa             Vampire                90
-107       bOuNdEr             Troll                  55
-115       aQuA                Mermaid                40
------------------------------------------------------
 
---- Sort Submenu (Descending) ---
-1. Sort by ID
-2. Sort by Name
-3. Sort by Type
-4. Sort by Level
-5. Back to Main Menu
-Enter selection: 3
+Sort Menu (descending):
+1. Sort by name
+2. Sort by type
+3. Sort by health
+4. Sort by strength
+5. Back to main menu
+Enter your choice: 2
 
------------------------------------------------------
-ID        Name                Type                Level
------------------------------------------------------
-113       sHaDoW              Wraith                 67
-109       fAnG                Werewolf               64
-108       dRaCuLa             Vampire                90
-107       bOuNdEr             Troll                  55
-106       rOLLer              Stroller               12
-111       tInK                Pixie                  15
-105       fLaMeR              Phoenix                85
-118       wInGs               Pegasus                60
-104       gRoG                Orc                    32
-116       tAuRoS              Minotaur               77
-115       aQuA                Mermaid                40
-117       sPlItTeR            Hydra                  95
-114       sKyClAw             Griffin                88
-112       sToNeR              Golem                  80
-101       sTRolleR            Goblin                 45
-103       rITA                Elf                    70
-102       sMaUg               Dragon                 99
-119       mIxUp               Chimera                82
-110       sWiFt               Centaur                73
-120       sCrEeCh             Banshee                50
------------------------------------------------------
+-------------------------------------------------------
+Name                Type               Health  Strength
+-------------------------------------------------------
+sHaDoW              Wraith                113        67
+fAnG                Werewolf              109        64
+dRaCuLa             Vampire               108        90
+bOuNdEr             Troll                 107        55
+rOLLer              Stroller              106        12
+tInK                Pixie                 111        15
+fLaMeR              Phoenix               105        85
+wInGs               Pegasus               118        60
+gRoG                Orc                   104        32
+tAuRoS              Minotaur              116        77
+aQuA                Mermaid               115        40
+sPlItTeR            Hydra                 117        95
+sKyClAw             Griffin               114        88
+sToNeR              Golem                 112        80
+sTRolleR            Goblin                101        45
+rITA                Elf                   103        70
+sMaUg               Dragon                102        99
+mIxUp               Chimera               119        82
+sWiFt               Centaur               110        73
+sCrEeCh             Banshee               120        50
+-------------------------------------------------------
 
---- Sort Submenu (Descending) ---
-1. Sort by ID
-2. Sort by Name
-3. Sort by Type
-4. Sort by Level
-5. Back to Main Menu
-Enter selection: 4
 
------------------------------------------------------
-ID        Name                Type                Level
------------------------------------------------------
-102       sMaUg               Dragon                 99
-117       sPlItTeR            Hydra                  95
-108       dRaCuLa             Vampire                90
-114       sKyClAw             Griffin                88
-105       fLaMeR              Phoenix                85
-119       mIxUp               Chimera                82
-112       sToNeR              Golem                  80
-116       tAuRoS              Minotaur               77
-110       sWiFt               Centaur                73
-103       rITA                Elf                    70
-113       sHaDoW              Wraith                 67
-109       fAnG                Werewolf               64
-118       wInGs               Pegasus                60
-107       bOuNdEr             Troll                  55
-120       sCrEeCh             Banshee                50
-101       sTRolleR            Goblin                 45
-115       aQuA                Mermaid                40
-104       gRoG                Orc                    32
-111       tInK                Pixie                  15
-106       rOLLer              Stroller               12
------------------------------------------------------
+Sort Menu (descending):
+1. Sort by name
+2. Sort by type
+3. Sort by health
+4. Sort by strength
+5. Back to main menu
+Enter your choice: 3
 
---- Sort Submenu (Descending) ---
-1. Sort by ID
-2. Sort by Name
-3. Sort by Type
-4. Sort by Level
-5. Back to Main Menu
-Enter selection: 5
-Returning to main menu...
+-------------------------------------------------------
+Name                Type               Health  Strength
+-------------------------------------------------------
+sCrEeCh             Banshee               120        50
+mIxUp               Chimera               119        82
+wInGs               Pegasus               118        60
+sPlItTeR            Hydra                 117        95
+tAuRoS              Minotaur              116        77
+aQuA                Mermaid               115        40
+sKyClAw             Griffin               114        88
+sHaDoW              Wraith                113        67
+sToNeR              Golem                 112        80
+tInK                Pixie                 111        15
+sWiFt               Centaur               110        73
+fAnG                Werewolf              109        64
+dRaCuLa             Vampire               108        90
+bOuNdEr             Troll                 107        55
+rOLLer              Stroller              106        12
+fLaMeR              Phoenix               105        85
+gRoG                Orc                   104        32
+rITA                Elf                   103        70
+sMaUg               Dragon                102        99
+sTRolleR            Goblin                101        45
+-------------------------------------------------------
 
-=== Main Menu ===
-1. Print Original List
-2. Sort Menu (Descending)
-3. Search (Name or Type)
+
+Sort Menu (descending):
+1. Sort by name
+2. Sort by type
+3. Sort by health
+4. Sort by strength
+5. Back to main menu
+Enter your choice: 4
+
+-------------------------------------------------------
+Name                Type               Health  Strength
+-------------------------------------------------------
+sMaUg               Dragon                102        99
+sPlItTeR            Hydra                 117        95
+dRaCuLa             Vampire               108        90
+sKyClAw             Griffin               114        88
+fLaMeR              Phoenix               105        85
+mIxUp               Chimera               119        82
+sToNeR              Golem                 112        80
+tAuRoS              Minotaur              116        77
+sWiFt               Centaur               110        73
+rITA                Elf                   103        70
+sHaDoW              Wraith                113        67
+fAnG                Werewolf              109        64
+wInGs               Pegasus               118        60
+bOuNdEr             Troll                 107        55
+sCrEeCh             Banshee               120        50
+sTRolleR            Goblin                101        45
+aQuA                Mermaid               115        40
+gRoG                Orc                   104        32
+tInK                Pixie                 111        15
+rOLLer              Stroller              106        12
+-------------------------------------------------------
+
+
+Sort Menu (descending):
+1. Sort by name
+2. Sort by type
+3. Sort by health
+4. Sort by strength
+5. Back to main menu
+Enter your choice: 5
+
+Going back to the main menu
+
+
+Main Menu:
+1. Print creatures in the original order
+2. Sort menu
+3. Search by name or type
 4. Quit
-Enter selection: 3
-Enter search term (partial or full Name/Type): sToNeR
+Enter your choice: 3
 
------------------------------------------------------
-ID        Name                Type                Level
------------------------------------------------------
-112       sToNeR              Golem                  80
------------------------------------------------------
+Enter a name or type to search for (partial is ok): sT
 
-=== Main Menu ===
-1. Print Original List
-2. Sort Menu (Descending)
-3. Search (Name or Type)
+-------------------------------------------------------
+Name                Type               Health  Strength
+-------------------------------------------------------
+sTRolleR            Goblin                101        45
+rOLLer              Stroller              106        12
+sToNeR              Golem                 112        80
+-------------------------------------------------------
+
+
+Main Menu:
+1. Print creatures in the original order
+2. Sort menu
+3. Search by name or type
 4. Quit
-Enter selection: 5
-Invalid main menu selection.
+Enter your choice: 3
 
-=== Main Menu ===
-1. Print Original List
-2. Sort Menu (Descending)
-3. Search (Name or Type)
+Enter a name or type to search for (partial is ok): 3242fdsaI
+
+No matching records found
+
+
+Main Menu:
+1. Print creatures in the original order
+2. Sort menu
+3. Search by name or type
 4. Quit
-Enter selection: 1
+Enter your choice: 5
 
------------------------------------------------------
-ID        Name                Type                Level
------------------------------------------------------
-101       sTRolleR            Goblin                 45
-102       sMaUg               Dragon                 99
-103       rITA                Elf                    70
-104       gRoG                Orc                    32
-105       fLaMeR              Phoenix                85
-106       rOLLer              Stroller               12
-107       bOuNdEr             Troll                  55
-108       dRaCuLa             Vampire                90
-109       fAnG                Werewolf               64
-110       sWiFt               Centaur                73
-111       tInK                Pixie                  15
-112       sToNeR              Golem                  80
-113       sHaDoW              Wraith                 67
-114       sKyClAw             Griffin                88
-115       aQuA                Mermaid                40
-116       tAuRoS              Minotaur               77
-117       sPlItTeR            Hydra                  95
-118       wInGs               Pegasus                60
-119       mIxUp               Chimera                82
-120       sCrEeCh             Banshee                50
------------------------------------------------------
+Invalid menu choice
 
-=== Main Menu ===
-1. Print Original List
-2. Sort Menu (Descending)
-3. Search (Name or Type)
+
+Main Menu:
+1. Print creatures in the original order
+2. Sort menu
+3. Search by name or type
 4. Quit
-Enter selection: 2
+Enter your choice: Ifdsa
 
---- Sort Submenu (Descending) ---
-1. Sort by ID
-2. Sort by Name
-3. Sort by Type
-4. Sort by Level
-5. Back to Main Menu
-Enter selection: 7
-Invalid choice. Try again.
+Invalid menu choice
 
---- Sort Submenu (Descending) ---
-1. Sort by ID
-2. Sort by Name
-3. Sort by Type
-4. Sort by Level
-5. Back to Main Menu
-Enter selection: 5
-Returning to main menu...
 
-=== Main Menu ===
-1. Print Original List
-2. Sort Menu (Descending)
-3. Search (Name or Type)
+Main Menu:
+1. Print creatures in the original order
+2. Sort menu
+3. Search by name or type
 4. Quit
-Enter selection: 3
-Enter search term (partial or full Name/Type): 4321
+Enter your choice: !
 
------------------------------------------------------
-ID        Name                Type                Level
------------------------------------------------------
------------------------------------------------------
-No matching records found.
+Invalid menu choice
 
-=== Main Menu ===
-1. Print Original List
-2. Sort Menu (Descending)
-3. Search (Name or Type)
+
+Main Menu:
+1. Print creatures in the original order
+2. Sort menu
+3. Search by name or type
 4. Quit
-Enter selection: 4
-Exiting application. Goodbye!
-aidentsang@Aidens-MacBook-Pro CS216_L4_AT % */
+Enter your choice: 2
+
+
+Sort Menu (descending):
+1. Sort by name
+2. Sort by type
+3. Sort by health
+4. Sort by strength
+5. Back to main menu
+Enter your choice: 0
+
+Invalid menu choice
+
+
+Sort Menu (descending):
+1. Sort by name
+2. Sort by type
+3. Sort by health
+4. Sort by strength
+5. Back to main menu
+Enter your choice: 5
+
+Going back to the main menu
+
+
+Main Menu:
+1. Print creatures in the original order
+2. Sort menu
+3. Search by name or type
+4. Quit
+Enter your choice: 4
+
+Goodbye!
+aidentsang@Aidens-MacBook-Pro CS216_L4_AT % */ 
